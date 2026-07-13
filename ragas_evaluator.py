@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 # RAGAS imports (use ragas.evaluation API)
 try:
     from ragas.evaluation import LangchainLLMWrapper, LangchainEmbeddingsWrapper, Dataset, evaluate
-    from ragas.metrics import ResponseRelevancy, Faithfulness
+    from ragas.metrics import AnswerRelevancy, Faithfulness
     RAGAS_AVAILABLE = True
 except Exception:
     RAGAS_AVAILABLE = False
@@ -19,7 +19,7 @@ def evaluate_response_quality(question: str, answer: str, contexts: List[str]) -
         evaluator_llm = LangchainLLMWrapper(llm=ChatOpenAI(temperature=0.0, model_name="gpt-3.5-turbo"))
         evaluator_embeddings = LangchainEmbeddingsWrapper(embeddings=OpenAIEmbeddings(model="text-embedding-3-small"))
 
-        metrics = [ResponseRelevancy(), Faithfulness()]
+        metrics = [AnswerRelevancy(), Faithfulness()]
 
         # Build ragas Dataset
         ds = Dataset({
@@ -78,7 +78,7 @@ def batch_evaluate(questions_file: str, openai_key: str, chroma_dir: str, collec
     # prepare RAGAS wrappers
     evaluator_llm = LangchainLLMWrapper(llm=ChatOpenAI(temperature=0.0, model_name="gpt-3.5-turbo"))
     evaluator_embeddings = LangchainEmbeddingsWrapper(embeddings=OpenAIEmbeddings(model="text-embedding-3-small"))
-    metrics = [ResponseRelevancy(), Faithfulness()]
+    metrics = [AnswerRelevancy(), Faithfulness()]
 
     results_per_q = []
     aggregates = {}
