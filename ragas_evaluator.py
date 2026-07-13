@@ -90,50 +90,51 @@ def batch_evaluate(questions_file: str, openai_key: str, chroma_dir: str, collec
 
     questions = [l.strip() for l in p.read_text(encoding='utf-8').splitlines() if l.strip()]
 
+    q_list = []
+    contexts_list = []
+    answers_list = []
+    ground_truths = []
+
     for q in questions:
-        # retrieve
         docs_result = rag_client.retrieve_documents(collection, q, n_results=n_docs)
         contexts = []
         ctx_string = ""
+        metas = []
         if docs_result and docs_result.get('documents'):
             contexts = docs_result['documents'][0]
-            ctx_string = rag_client.format_context(contexts, docs_result.get('metadatas', [[]])[0])
+            metas = docs_result.get('metadatas', [[]])[0]
+            ctx_string = rag_client.format_context(contexts, metas)
 
-        # generate answer
         answer = llm_client.generate_response(openai_key, q, ctx_string, [], model="gpt-3.5-turbo")
 
-        # evaluate
-        sample = SingleTurnSample(input=q, output=answer, contexts=contexts)
-        try:
-            res = evaluate(samples=[sample], metrics=metrics, llm=evaluator_llm, embeddings=evaluator_embeddings)
-        except Exception as e:
-            res = {"error": str(e)}
+        q_list.append(q)
+        contexts_list.append(contexts)
+        answers_list.append(answer)
+        ground_truths.append([])
 
-        results_per_q.append({"question": q, "answer": answer, "ragas_result": res})
+        results_per_q.append({"question": q, "answer": answer, "contexts": contexts})
 
-    # compute simple aggregates (mean) for numeric metrics if possible
-    sums = {}
-    counts = {}
-    for item in results_per_q:
-        r = item['ragas_result']
-        if isinstance(r, list) and r:
-            metrics_dict = r[0].get('metrics', {})
-        elif isinstance(r, dict) and 'metrics' in r:
-            metrics_dict = r.get('metrics', {})
-        else:
-            metrics_dict = {}
+    # Build a ragas Dataset for batch evaluation
+    ds = Dataset({
+        'question': q_list,
+        'contexts': contexts_list,
+        'answer': answers_list,
+        'ground_truth': ground_truths,
+    })
 
-        for k, v in metrics_dict.items():
-            try:
-                val = float(v)
-            except Exception:
-                continue
-            sums[k] = sums.get(k, 0.0) + val
-            counts[k] = counts.get(k, 0) + 1
+    try:
+        eval_result = evaluate(dataset=ds, metrics=metrics, llm=evaluator_llm, embeddings=evaluator_embeddings)
+    except Exception as e:
+        return {"error": f"Evaluation failed: {e}"}
 
-    aggregates = {k: (sums[k] / counts[k]) if counts.get(k) else None for k in sums.keys()}
+    # extract aggregated metric values
+    try:
+        d = eval_result.to_dict() if hasattr(eval_result, 'to_dict') else dict(eval_result)
+    except Exception:
+        d = {}
 
-    out = {"results": results_per_q, "aggregates": aggregates}
+    # attach metrics to overall output
+    out = {"results": results_per_q, "aggregates": d}
     try:
         with open(output_file, 'w', encoding='utf-8') as fh:
             json.dump(out, fh, indent=2)
