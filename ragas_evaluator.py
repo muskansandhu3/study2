@@ -16,7 +16,7 @@ def evaluate_response_quality(question: str, answer: str, contexts: List[str]) -
         return {"error": "RAGAS not available"}
     
     try:
-        evaluator_llm = LangchainLLMWrapper(llm=ChatOpenAI(temperature=0.0, model_name="gpt-3.5-turbo"))
+        evaluator_llm = LangchainLLMWrapper(langchain_llm=ChatOpenAI(temperature=0.0, model_name="gpt-3.5-turbo"))
         evaluator_embeddings = LangchainEmbeddingsWrapper(embeddings=OpenAIEmbeddings(model="text-embedding-3-small"))
 
         metrics = [AnswerRelevancy(), Faithfulness()]
@@ -76,7 +76,7 @@ def batch_evaluate(questions_file: str, openai_key: str, chroma_dir: str, collec
         return {"error": f"Failed to initialize collection: {error}"}
 
     # prepare RAGAS wrappers
-    evaluator_llm = LangchainLLMWrapper(llm=ChatOpenAI(temperature=0.0, model_name="gpt-3.5-turbo"))
+    evaluator_llm = LangchainLLMWrapper(langchain_llm=ChatOpenAI(temperature=0.0, model_name="gpt-3.5-turbo"))
     evaluator_embeddings = LangchainEmbeddingsWrapper(embeddings=OpenAIEmbeddings(model="text-embedding-3-small"))
     metrics = [AnswerRelevancy(), Faithfulness()]
 
