@@ -114,16 +114,20 @@ def batch_evaluate(questions_file: str, openai_key: str, chroma_dir: str, collec
 
         results_per_q.append({"question": q, "answer": answer, "contexts": contexts})
 
-    # Build a ragas Dataset for batch evaluation
-    ds = Dataset({
-        'question': q_list,
-        'contexts': contexts_list,
-        'answer': answers_list,
-        'ground_truth': ground_truths,
-    })
+    # Build a HuggingFace `datasets.Dataset` and pass it to ragas evaluate
+    try:
+        from datasets import Dataset as HFDataset
+        hf_ds = HFDataset.from_dict({
+            'question': q_list,
+            'contexts': contexts_list,
+            'answer': answers_list,
+            'ground_truth': ground_truths,
+        })
+    except Exception as e:
+        return {"error": f"Failed to build datasets Dataset: {e}"}
 
     try:
-        eval_result = evaluate(dataset=ds, metrics=metrics, llm=evaluator_llm, embeddings=evaluator_embeddings)
+        eval_result = evaluate(dataset=hf_ds, metrics=metrics, llm=evaluator_llm, embeddings=evaluator_embeddings)
     except Exception as e:
         return {"error": f"Evaluation failed: {e}"}
 
@@ -133,7 +137,6 @@ def batch_evaluate(questions_file: str, openai_key: str, chroma_dir: str, collec
     except Exception:
         d = {}
 
-    # attach metrics to overall output
     out = {"results": results_per_q, "aggregates": d}
     try:
         with open(output_file, 'w', encoding='utf-8') as fh:
