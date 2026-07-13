@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+
+# Chroma and DB
+chroma_db_openai/
+chroma_db/
+chroma_embedding_text_only.log
+
+# Env
+.env
