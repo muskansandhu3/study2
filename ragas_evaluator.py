@@ -117,19 +117,35 @@ def batch_evaluate(questions_file: str, openai_key: str, chroma_dir: str, collec
     # Build a HuggingFace `datasets.Dataset` and pass it to ragas evaluate
     try:
         from datasets import Dataset as HFDataset
+
+        # normalize nested list fields into joined strings to avoid nested-list dtypes
+        def _join_field(field_list, sep="\n\n---\n\n"):
+            out = []
+            for v in field_list:
+                if isinstance(v, list):
+                    out.append(sep.join([str(x) for x in v]))
+                else:
+                    out.append(str(v) if v is not None else "")
+            return out
+
+        contexts_joined = _join_field(contexts_list)
+        ground_truth_joined = _join_field(ground_truths)
+
         hf_ds = HFDataset.from_dict({
             'question': q_list,
-            'contexts': contexts_list,
+            'contexts': contexts_joined,
             'answer': answers_list,
-            'ground_truth': ground_truths,
+            'ground_truth': ground_truth_joined,
         })
     except Exception as e:
-        return {"error": f"Failed to build datasets Dataset: {e}"}
+        return {"error": f"Failed to build datasets Dataset: {e}", "traceback": str(e)}
 
     try:
         eval_result = evaluate(dataset=hf_ds, metrics=metrics, llm=evaluator_llm, embeddings=evaluator_embeddings)
     except Exception as e:
-        return {"error": f"Evaluation failed: {e}"}
+        import traceback
+        tb = traceback.format_exc()
+        return {"error": f"Evaluation failed: {e}", "traceback": tb}
 
     # extract aggregated metric values
     try:
