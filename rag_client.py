@@ -58,7 +58,11 @@ def discover_chroma_backends() -> Dict[str, Dict[str, str]]:
 def initialize_rag_system(chroma_dir: str, collection_name: str):
     """Initialize the RAG system with specified backend (cached for performance)"""
     try:
-        client = chromadb.Client(Settings(chroma_db_impl="duckdb+parquet", persist_directory=chroma_dir))
+        try:
+            client = chromadb.Client(Settings(chroma_db_impl="duckdb+parquet", persist_directory=chroma_dir))
+        except Exception:
+            client = chromadb.Client()
+
         try:
             collection = client.get_collection(collection_name)
         except Exception:

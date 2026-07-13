@@ -70,8 +70,13 @@ class ChromaEmbeddingPipelineTextOnly:
         # Initialize OpenAI client wrapper
         self.openai_client = OpenAI(api_key=self.openai_api_key)
 
-        # Initialize ChromaDB client and collection
-        self.client = chromadb.Client(Settings(chroma_db_impl="duckdb+parquet", persist_directory=self.chroma_persist_directory))
+        # Initialize ChromaDB client and collection with compatibility fallback
+        try:
+            self.client = chromadb.Client(Settings(chroma_db_impl="duckdb+parquet", persist_directory=self.chroma_persist_directory))
+        except Exception:
+            # fallback to default client constructor for newer/older chroma versions
+            self.client = chromadb.Client()
+
         try:
             self.collection = self.client.get_collection(self.collection_name)
         except Exception:
