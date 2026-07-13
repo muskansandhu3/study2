@@ -1,7 +1,9 @@
 openai>=1.0.0
-chromadb>=0.4.0
+# Pin chromadb to a known compatible version
+chromadb==0.4.8
 ragas
 langchain>=0.1.0
 streamlit
 langchain-openai
 pandas
+tqdm

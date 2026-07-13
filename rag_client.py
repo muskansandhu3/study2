@@ -70,10 +70,11 @@ def initialize_rag_system(chroma_dir: str, collection_name: str):
 def retrieve_documents(collection, query: str, n_results: int = 3, 
                       mission_filter: Optional[str] = None) -> Optional[Dict]:
     """Retrieve relevant documents from ChromaDB with optional filtering"""
-
     filter_dict = None
-    if mission_filter and mission_filter.lower() not in ("all", "none", ""):
-        filter_dict = {"mission": mission_filter}
+    if mission_filter and mission_filter.lower() not in ("all", "none", "", "any"):
+        # normalize mission filter to lowercase and underscores
+        mf = mission_filter.lower().replace(' ', '_')
+        filter_dict = {"mission": mf}
 
     try:
         results = collection.query(
@@ -82,12 +83,53 @@ def retrieve_documents(collection, query: str, n_results: int = 3,
             where=filter_dict,
             include=["metadatas", "documents", "distances"],
         )
-        return results
+
+        # chroma returns lists per-query: normalize and deduplicate documents by content
+        docs = []
+        metas = []
+        dists = []
+
+        if results is None:
+            return None
+
+        # support both dict and object-like responses
+        documents = results.get('documents', [[]])[0] if isinstance(results, dict) else []
+        metadatas = results.get('metadatas', [[]])[0] if isinstance(results, dict) else []
+        distances = results.get('distances', [[]])[0] if isinstance(results, dict) else []
+
+        seen = set()
+        for i, doc in enumerate(documents):
+            key = (doc or '').strip()[:500]
+            if not key:
+                continue
+            if key in seen:
+                continue
+            seen.add(key)
+            docs.append(doc)
+            metas.append(metadatas[i] if i < len(metadatas) else {})
+            dists.append(distances[i] if i < len(distances) else None)
+
+        return {"documents": [docs], "metadatas": [metas], "distances": [dists]}
     except Exception:
         # Try a fallback without 'where' if filter fails
         try:
             results = collection.query(query_texts=[query], n_results=n_results, include=["metadatas", "documents", "distances"])
-            return results
+            if results is None:
+                return None
+            documents = results.get('documents', [[]])[0]
+            metadatas = results.get('metadatas', [[]])[0]
+            distances = results.get('distances', [[]])[0]
+            seen = set()
+            docs, metas, dists = [], [], []
+            for i, doc in enumerate(documents):
+                key = (doc or '').strip()[:500]
+                if not key or key in seen:
+                    continue
+                seen.add(key)
+                docs.append(doc)
+                metas.append(metadatas[i] if i < len(metadatas) else {})
+                dists.append(distances[i] if i < len(distances) else None)
+            return {"documents": [docs], "metadatas": [metas], "distances": [dists]}
         except Exception:
             return None
 

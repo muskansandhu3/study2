@@ -28,3 +28,14 @@ streamlit run chat.py
 Notes:
 - If you don't have real data yet, put a few small `.txt` files in `./data/apollo11`, `./data/apollo13`, or `./data/challenger` for testing.
 - Pushing to GitHub requires your local Git to be configured with credentials or SSH keys.
+
+Batch evaluation (RAGAS)
+------------------------
+
+After you have built the embeddings and have a populated Chroma collection, run the batch evaluator:
+
+```bash
+python -c "from ragas_evaluator import batch_evaluate; import json; print(json.dumps(batch_evaluate('evaluation_dataset.txt', '<OPENAI_KEY>', './chroma_db_openai', 'nasa_space_missions_text', n_docs=3), indent=2))"
+```
+
+Or run in a Python script to save results to a JSON file. The evaluator will retrieve top-k docs for each question, generate an answer using the LLM grounded in the retrieved context, compute RAGAS `ResponseRelevancy` and `Faithfulness`, and output per-question results plus aggregate averages.

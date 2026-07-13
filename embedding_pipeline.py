@@ -94,37 +94,52 @@ class ChromaEmbeddingPipelineTextOnly:
         max_size = int(self.chunk_size)
         overlap = int(self.chunk_overlap)
 
-        # Simple sentence-aware splitter
-        sentences = [s.strip() for s in text.replace('\n', ' ').split('. ') if s.strip()]
+        text = text.replace('\r\n', '\n').replace('\n', ' ')
+        length = len(text)
         chunks: List[Tuple[str, Dict[str, Any]]] = []
-        current = ""
+        start = 0
         chunk_index = 0
 
-        for sent in sentences:
-            if current:
-                candidate = current + ". " + sent
-            else:
-                candidate = sent
+        while start < length:
+            end = min(start + max_size, length)
 
-            if len(candidate) <= max_size:
-                current = candidate
-            else:
-                # push current as a chunk
-                chunk_meta = dict(metadata)
-                chunk_meta['chunk_index'] = chunk_index
-                chunks.append((current, chunk_meta))
+            # try to break at the last sentence boundary within the window
+            window = text[start:end]
+            last_period = window.rfind('. ')
+            if last_period != -1 and end != length:
+                # extend to include the period
+                end = start + last_period + 1
+
+            # ensure we make progress
+            if end <= start:
+                end = min(start + max_size, length)
+
+            chunk = text[start:end].strip()
+            if chunk:
+                meta = dict(metadata)
+                meta['chunk_index'] = chunk_index
+                chunks.append((chunk, meta))
                 chunk_index += 1
 
-                # start new chunk, allow overlap by taking last overlap chars
-                start_overlap = max(0, len(current) - overlap)
-                current = current[start_overlap:] + ". " + sent if start_overlap > 0 else sent
+            # advance start by window minus overlap, but ensure progress
+            next_start = end - overlap
+            if next_start <= start:
+                next_start = end
+            start = max(0, next_start)
 
-        if current:
-            chunk_meta = dict(metadata)
-            chunk_meta['chunk_index'] = chunk_index
-            chunks.append((current, chunk_meta))
+        # final dedupe: remove any empty or duplicate chunks
+        seen = set()
+        final_chunks: List[Tuple[str, Dict[str, Any]]] = []
+        for txt, meta in chunks:
+            key = txt.strip()[:500]
+            if not txt.strip():
+                continue
+            if key in seen:
+                continue
+            seen.add(key)
+            final_chunks.append((txt, meta))
 
-        return chunks
+        return final_chunks
     
     def check_document_exists(self, doc_id: str) -> bool:
         """
